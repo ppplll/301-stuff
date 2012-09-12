@@ -1,0 +1,4 @@
+myapp : lab01.c main.c
+	gcc -c lab01.c -g -Wall -I.
+	gcc -c main.c -g -Wall
+	gcc -o lab01 lab01.o main.o
