@@ -9,60 +9,69 @@ removewhitespace(char *s1)
     // remove whitespace from a string, in place
     if (!s1)
         return;
-    
-    char *s2 = strdup(s1);
-    free(s1);
-    char *buffer = malloc(sizeof(s2));
+    int len = strlen(s1);
+    char buffer[len];
     int i = 0;
     int j = 0;
-    for (; i < strlen(s2); i++) {
-        if (!isspace(s2[i])) {
-            buffer[j] = s2[i];
+    for (; i < strlen(s1); i++) {
+        if (!isspace(s1[i])) {
+            buffer[j] = s1[i];
             j++;
         }
     }
-    buffer[j] = '\0';
-    strcpy(s1, buffer);
+    buffer[j] = '\0';    
+    strncpy(s1, buffer, (j+1));
 }
 
 
-char**
-tokenify(char *s)
+char** tokenify(char *s)
 {
+    
     const char *sep=" \t\n";
     char *word = NULL;
-
+    int len = strlen(s);
+    char *s2 = (char *)malloc(sizeof(char)*(len+1));
+    strncpy(s2,s,len+1);
     // find out exactly how many tokens we have
     int words = 0;
-    for (word = strtok(s, sep);
-         word;
-         word = strtok(NULL, sep)) words++ ;
-
-    printf("words: %d\n", words);
-    printf("s: %s\n", s);
+    word = strtok(s,sep);
+    while (word){    
+        printf("words: %d\n", words);
+        printf("s: %s\n", word);
+        word = strtok(NULL,sep);
+        words++;
+        }
+   
 
     // allocate the array of char *'s, with one additional
-    char **array = (char **)malloc(sizeof(char)*(words+1));
+    char **array = (char **)malloc(sizeof(char*)*(words+1));
     int i = 0;
-    for (word = strtok(s, sep);
-         word;
-         word = strtok(NULL, sep)) {
+    word = strtok(s2, sep);
+    for (; i<words; i++) {
         printf("adding word %s to array pos %d\n", word, i);
+        //printf("%s",word);
         array[i] = strdup(word);
-        i++;
+        word = strtok(NULL, sep);
     }
+    array[i] = NULL;
+    free(s2);
     return array;
 }
 
 void
 printtokens(char **tokenlist) {
-    char *tmp = tokenlist[0];
+    if (tokenlist == NULL){
+        return;
+    }
+    //char *tmp = tokenlist[0];
     int toknum = 0;
     printf("Printing tokens:\n");
-    while (tmp != NULL) {
-        printf("\t%d: <%s>\n", toknum, tmp);
-        toknum++;
-    }
+    while(tokenlist[toknum] != NULL) {
+        printf("\t%d: <%s>\n", toknum, tokenlist[toknum]);
+	    free(tokenlist[toknum]);
+    	toknum++;
+        }
+    free(tokenlist);
 }
 
 int
@@ -77,6 +86,7 @@ main(int argc, char **argv) {
     removewhitespace(s2);
     printf("Remove whitespace - s1: %s\n", s1);
     printf("Remove whitespace - s2: %s\n", s2);
+    
 
     printtokens(tokenify(s3));
     printtokens(tokenify(s4));
