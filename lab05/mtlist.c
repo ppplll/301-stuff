@@ -47,8 +47,8 @@ void usage(const char *progname) {
 }
 
 int main(int argc, char **argv) {
-    int num_threads = 1;
-    int values_to_add = 10;
+    int num_threads = 10;
+    int values_to_add = 100000;
     
     int c;
     while ((c = getopt(argc, argv, "t:m:h")) != -1) {
@@ -90,6 +90,7 @@ int main(int argc, char **argv) {
     // start up the threads; they'll start adding to the hashtable
     // immediately.
     for (i = 0; i < num_threads; i++) {
+	fprintf(stderr,"%d",i);
         if (0 > pthread_create(&threads[i], NULL, worker_thread, (void*)&targs)) {
             fprintf(stderr, "Error creating thread: %s\n", strerror(errno));
         }
@@ -102,7 +103,7 @@ int main(int argc, char **argv) {
 
     // commented out by default...
     // list_print(thelist, stdout);
-
+    
     list_clear(thelist);
     free(thelist);
 
