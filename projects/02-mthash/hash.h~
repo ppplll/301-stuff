@@ -8,11 +8,11 @@
 #include "list.h"
 
 
-typedef struct {
+typedef struct hashtable_t{
 int bins;
 list_t **table;
 pthread_mutex_t *mutex;
-} hashtable_t;
+}
 
 // create a new hashtable; parameter is a size hint
 hashtable_t *hashtable_new(int);

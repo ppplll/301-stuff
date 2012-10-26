@@ -91,7 +91,7 @@ void hashtable_remove(hashtable_t *hashtable, const char *s)
 
 // print the contents of the hashtable
 void hashtable_print(hashtable_t *hashtable) {
-    pthread_mutex_lock((hashtable->mutex));//make it a snapshot of when print is called
+    pthread_mutex_lock((hashtable->mutex))//make it a snapshot of when print is called
     int i = 0;
     while ((hashtable->table)[i]){
         printf("***Start bin %d***\n",i); 
