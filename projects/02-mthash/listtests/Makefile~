@@ -1,11 +1,11 @@
 CC = gcc
 CFLAGS = -g -Wall -pthread
 # main executable file first
-TARGET = mthash
+TARGET = listtest
 # object files next
-OBJS = main.o hash.o list.o
+OBJS = testlist.o  list.o
 # header files next
-DEPS = hash.h list.h
+DEPS =  list.h
 .PHONY : clean
 
 all: $(TARGET)

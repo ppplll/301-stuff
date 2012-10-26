@@ -102,6 +102,7 @@ int list_remove(list_t *list, char *s) {
            pthread_mutex_unlock((list->mutex));
            return 1;
         }
+	tmp = temp->next;
     }
 
 

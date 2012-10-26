@@ -1,18 +1,18 @@
 #ifndef __HASH_H__
-
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <string.h>
 #include <errno.h>
 #include "list.h"
+#include <math.h>
 
 
-typedef struct hashtable_t{
+typedef struct {
 int bins;
 list_t **table;
 pthread_mutex_t *mutex;
-}
+} hashtable_t;
 
 // create a new hashtable; parameter is a size hint
 hashtable_t *hashtable_new(int);

@@ -23,6 +23,7 @@ void *hasher_thread(void *v) {
     struct args *args = (struct args *)v;
     
     fprintf(stderr,"Thread %p running\n", pthread_self());
+    printf("ere");
     int start_value = random() % args->num_words;
     int values_to_add = args->max_values;
     int i = 0;

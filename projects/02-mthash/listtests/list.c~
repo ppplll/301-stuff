@@ -32,11 +32,11 @@ pthread_mutex_unlock((list->mutex));
 /* **************************************
 * add string to end of list
 * ************************************** */
-void list_add(list_t *list, char *s) {
+void list_add(list_t *list, const char *s) {
     pthread_mutex_lock((list->mutex));
     struct __list_node *new_node = (struct __list_node *)malloc (sizeof(struct __list_node));
     int len = strlen(s);
-    char * str = malloc(sizeof(char *)*(len+1));
+    const char * str = malloc(sizeof(char *)*(len+1));
     if (!new_node || !str) {
         fprintf(stderr, "No memory while attempting to create a new list node!\n");
 pthread_mutex_unlock((list->mutex));
@@ -79,7 +79,7 @@ pthread_mutex_unlock((list->mutex));
 * remove first string equal to target.
 * return 1 if successful, 0 otherwise
 * ************************************** */
-int list_remove(list_t *list, char *s) {
+int list_remove(list_t *list, const char *s) {
     pthread_mutex_lock((list->mutex));
     /* short cut: is the list empty? */
     if (list->head == NULL){
