@@ -5,6 +5,9 @@
 #include <math.h>
 #include "list.h"
 
+/*this is our hashtable file. Because our hashtable is an array of linked lists, it runs heavily on our linked list file. Most of our computation takes place in the lists, and these functions essentially make sure the right lists are opperated on*/
+
+
 
 int primeNearby(int hint){//find the closest prime number
     const int primes[307] = {2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,
@@ -29,9 +32,9 @@ int primeNearby(int hint){//find the closest prime number
     int nearby = 0;
     int i = 0;
     for (; i<307;i++){
-        if (abs(primes[i]-hint) < closest){
-            closest = abs(primes[i]-hint);
-            nearby = i;
+        if (abs(primes[i]-hint) < closest){//if this primes closer
+            closest = abs(primes[i]-hint);//then its the closest
+            nearby = i;//so save it
         }
     }
     return primes[nearby];
@@ -40,25 +43,25 @@ int primeNearby(int hint){//find the closest prime number
 // create a new hashtable; parameter is a size hint
 hashtable_t *hashtable_new(int sizehint)
 {
-	if (sizehint <= 0){
+	if (sizehint <= 0){//test for a wise-guy
 		return NULL;
 	}
-	int bins = primeNearby(sizehint);
+	int bins = primeNearby(sizehint);//find the bin size
 
 	pthread_mutex_t * mutex = malloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init(mutex,NULL);
+	pthread_mutex_init(mutex,NULL);//create the lock
 
-	list_t **table = malloc(sizeof(list_t *)*(bins+1));    
+	list_t **table = malloc(sizeof(list_t *)*(bins+1));  // create an array of pointers to lists  
 	table[bins]=NULL;
 	int i = 0;
 	for(;i<bins;i++)
 	{	
-		list_t * tmp =malloc(sizeof(list_t));
+		list_t * tmp =malloc(sizeof(list_t));//create the lists, and point to them
 		list_init(tmp);
         table[i] = tmp;
 	}
 
-	hashtable_t * ht = malloc(sizeof(hashtable_t));
+	hashtable_t * ht = malloc(sizeof(hashtable_t));//create and set the hashtable
 	ht->table = table;
 	ht->mutex = mutex;
 	ht->bins = bins;
@@ -74,7 +77,7 @@ hashtable_t *hashtable_new(int sizehint)
 // free anything allocated by the hashtable library
 void hashtable_free(hashtable_t *hashtable)
 {
-    pthread_mutex_lock (hashtable->mutex);
+    pthread_mutex_lock (hashtable->mutex);//lock the table so nothing else can happen to it (eg somebody adding to an already freed area of mem)
 	if (hashtable == NULL){
 		return;
 	}
@@ -83,13 +86,12 @@ void hashtable_free(hashtable_t *hashtable)
 	{
 		list_clear((hashtable->table)[i]);
 	}
-	
+	//free the remaining items
 	free(hashtable->table);
     pthread_mutex_unlock (hashtable->mutex);
     pthread_mutex_destroy(hashtable->mutex);
     free(hashtable->mutex);
 	free(hashtable);
-    
 
 
 }
@@ -124,6 +126,9 @@ int hash_funct(const char *s, int bins){
 
 // add a new string to the hashtable
 void hashtable_add(hashtable_t *hashtable, const char *s) {
+//this function does have a lock check, but does not actually lock the table,
+//instead we allow for the lock inside the lists to ensure thread saftey, but
+// therotically allow for two adds/removes to occur on the same table safely
 	if (s == NULL || hashtable == NULL){
 		return;
 	}
@@ -141,31 +146,36 @@ void hashtable_add(hashtable_t *hashtable, const char *s) {
 // doesn't exist in the hashtable, do nothing
 void hashtable_remove(hashtable_t *hashtable, const char *s)
 {
+//this function does have a lock check, but does not actually lock the table,
+//instead we allow for the lock inside the lists to ensure thread saftey, but
+// therotically allow for two adds/removes to occur on the same table safely
 	if (s == NULL || hashtable == NULL){
 		return;
 	}
 	pthread_mutex_lock(hashtable->mutex);
 	pthread_mutex_unlock(hashtable->mutex);
-	int hashval = hash_funct(s,hashtable->bins);
-	list_remove((hashtable->table)[hashval],s);
+	int hashval = hash_funct(s,hashtable->bins);// get hashvalue
+	list_remove((hashtable->table)[hashval],s);//remove from list
 	return;
 }
 
 
 // print the contents of the hashtable
 void hashtable_print(hashtable_t *hashtable) {
-	if (hashtable == NULL){
-		return;
+   /* we lock the whole table to make it a snapshot of when print is called(ie any adds/removed called after print will not be shown in print, but not yet finished adds and removes will finish, then result will be printed. this occurs becasue the adds and removes lock individual threads.*/
+
+	if (hashtable == NULL){//you think i'm Funny?
+		return;// you think im a funny guy?
 	}
-    pthread_mutex_lock((hashtable->mutex));//make it a snapshot of when print is called
+    pthread_mutex_lock((hashtable->mutex));//lock it
     int i = 0;
     while ((hashtable->table)[i]){
         printf("***Start bin %d***\n",i); 
-        list_print((hashtable->table)[i]);
+        list_print((hashtable->table)[i]);//print each list
         printf("***End bin %d***\n\n", i);
         i++;
     }
-    pthread_mutex_unlock((hashtable->mutex));
+    pthread_mutex_unlock((hashtable->mutex));//unlock it
     return;
 
 }

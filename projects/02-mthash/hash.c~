@@ -29,9 +29,9 @@ int primeNearby(int hint){//find the closest prime number
     int nearby = 0;
     int i = 0;
     for (; i<307;i++){
-        if (abs(primes[i]-hint) < closest){
-            closest = abs(primes[i]-hint);
-            nearby = i;
+        if (abs(primes[i]-hint) < closest){//if this primes closer
+            closest = abs(primes[i]-hint);//then its the closest
+            nearby = i;//so save it
         }
     }
     return primes[nearby];
@@ -40,25 +40,25 @@ int primeNearby(int hint){//find the closest prime number
 // create a new hashtable; parameter is a size hint
 hashtable_t *hashtable_new(int sizehint)
 {
-	if (sizehint <= 0){
+	if (sizehint <= 0){//test for a wise-guy
 		return NULL;
 	}
-	int bins = primeNearby(sizehint);
+	int bins = primeNearby(sizehint);//find the bin size
 
 	pthread_mutex_t * mutex = malloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init(mutex,NULL);
+	pthread_mutex_init(mutex,NULL);//create the lock
 
-	list_t **table = malloc(sizeof(list_t *)*(bins+1));    
+	list_t **table = malloc(sizeof(list_t *)*(bins+1));  // create an array of pointers to lists  
 	table[bins]=NULL;
 	int i = 0;
 	for(;i<bins;i++)
 	{	
-		list_t * tmp =malloc(sizeof(list_t));
+		list_t * tmp =malloc(sizeof(list_t));//create the lists, and point to them
 		list_init(tmp);
         table[i] = tmp;
 	}
 
-	hashtable_t * ht = malloc(sizeof(hashtable_t));
+	hashtable_t * ht = malloc(sizeof(hashtable_t));//create and set the hashtable
 	ht->table = table;
 	ht->mutex = mutex;
 	ht->bins = bins;
@@ -74,7 +74,7 @@ hashtable_t *hashtable_new(int sizehint)
 // free anything allocated by the hashtable library
 void hashtable_free(hashtable_t *hashtable)
 {
-    pthread_mutex_lock (hashtable->mutex);
+    pthread_mutex_lock (hashtable->mutex);//lock the table so nothing else can happen to it (eg somebody adding to an already freed area of mem)
 	if (hashtable == NULL){
 		return;
 	}
@@ -85,11 +85,12 @@ void hashtable_free(hashtable_t *hashtable)
 	}
 	
 	free(hashtable->table);
+    setpark();
     pthread_mutex_unlock (hashtable->mutex);
-    pthread_mutex_destroy(hashtable->mutex)
+    pthread_mutex_destroy(hashtable->mutex);
     free(hashtable->mutex);
 	free(hashtable);
-    
+    park();
 
 
 }

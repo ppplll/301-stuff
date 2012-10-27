@@ -6,6 +6,7 @@
  *
  * ************************************** */
 void list_init(list_t *list) {
+    //list has a seperate lock to allow for either extra thread saftey, or more fined grained thread saftey deppending on the context.
     list->mutex = malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init((list->mutex),NULL);
     list->head = NULL;
@@ -17,15 +18,15 @@ void list_init(list_t *list) {
 * print the contents of the list to file f.
 * ************************************** */
 void list_print(list_t *list) {
-    pthread_mutex_lock((list->mutex));
+    pthread_mutex_lock((list->mutex));//lock the list
     //printf("*** List Contents Begin ***\n");
     struct __list_node *tmp = list->head;
-    while (tmp) {
-        printf("%s\n", tmp->str);
+    while (tmp) {//go through each node
+        printf("%s\n", tmp->str);//and print
         tmp = tmp->next;
     }
    // printf("*** List Contents End ***\n");
-pthread_mutex_unlock((list->mutex));
+pthread_mutex_unlock((list->mutex));// unlock
 }
 
 
@@ -33,8 +34,9 @@ pthread_mutex_unlock((list->mutex));
 * add string to end of list
 * ************************************** */
 void list_add(list_t *list, char *s) {
-    pthread_mutex_lock((list->mutex));
-    struct __list_node *new_node = (struct __list_node *)malloc (sizeof(struct __list_node));
+    pthread_mutex_lock((list->mutex));//lock the list
+//create a new node   
+     struct __list_node *new_node = (struct __list_node *)malloc (sizeof(struct __list_node));
     int len = strlen(s);
     char * str = malloc(sizeof(char *)*(len+1));
     if (!new_node || !str) {
@@ -51,27 +53,14 @@ pthread_mutex_unlock((list->mutex));
     /* special case: list is currently empty */
     if (list->head == NULL) {
         list->head = new_node;
-    } /*else if (val <= list->head->data) {
-        new_node->next = tmp;
-        list->head = new_node;
-    } */else {
-        while (tmp->next) {//add to end of list
+    } else {//otherwise add to end of list
+        while (tmp->next) {
             tmp = tmp->next;
-            /*if (val >= tmp->data && val <= tmp->next->data) {
-                new_node->next = tmp->next;
-                tmp->next = new_node;
-                added = 1;
-                break;
-            }
-            tmp = tmp->next;*/
         }
         tmp->next = new_node;
 
-        /*if (!added) {
-            tmp->next = new_node;
-        }*/
     }
-pthread_mutex_unlock((list->mutex));
+pthread_mutex_unlock((list->mutex));// unlock
 }
 
 
@@ -110,7 +99,7 @@ int list_remove(list_t *list, char *s) {
 
 
 pthread_mutex_unlock((list->mutex));
-    return 0;
+    return 0;//if  value not found, return zero
 }
 
 
@@ -119,15 +108,16 @@ pthread_mutex_unlock((list->mutex));
 * elements.
 * ************************************** */
 void list_clear(list_t *list) {
-   pthread_mutex_lock((list->mutex));
+   pthread_mutex_lock((list->mutex));//lock it
     struct __list_node *tmp = list->head;
-    while (tmp) {
+    while (tmp) {//run through list and free all nodes
         struct __list_node *tmp2 = tmp->next;
         free(tmp->str);        
         free(tmp);
         tmp = tmp2;
     }
     list->head = NULL;
+    //free yourself from the lock, then destroy it, and free yourself
     pthread_mutex_unlock((list->mutex));
     pthread_mutex_destroy((list->mutex));
     free(list->mutex);
