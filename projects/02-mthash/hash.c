@@ -7,6 +7,9 @@
 
 /*this is our hashtable file. Because our hashtable is an array of linked lists, it runs heavily on our linked list file. Most of our computation takes place in the lists, and these functions essentially make sure the right lists are opperated on*/
 
+/* This was a joint venture of Andrew Kephart and Sean Dalrymple. The majority of the coding was done together, with small individual sessions inbetween the group work. Technically, Sean worked on the add, print, and list functions, while Andrew worked on the intialize, remove, and free functions. In reality all functions were analyzed, designed and debugged in tandem, with a few nitty gritty issues done indvidually. */
+
+
 
 
 int primeNearby(int hint){//find the closest prime number
