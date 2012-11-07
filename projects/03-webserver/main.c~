@@ -39,24 +39,6 @@ void usage(const char *progname) {
 
 
 void handlerequest(int socket){
-    char *filename[1024];
-    struct stat statresult
-    int fofo = 0
-    if (getrequest(socket, filename, 1024)){
-        printf("failure\n");
-    }
-    else {
-        fofo = stat(filename, &statresult);
-        if(!(fofo)){//if the file exists, start scripting
-            //twohundred
-        }
-        else{//heading for a 200 error
-            //check error condition (EFAULT)
-            //fourofour()
-        
-        
-    
-    
     printf("i have it under control ;)");
     return;
 }
