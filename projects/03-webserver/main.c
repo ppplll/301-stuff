@@ -11,6 +11,8 @@
 #include <arpa/inet.h>
 
 #include "network.h"
+/*Andrew Kephart and Sean Dalrymple worked on this project together. While most the work was done together, and nearly all the debugging was done together, Andrew focused on the logging, and Sean focused on sending the data out. the worker design was preliminary thought of by Sean, but then radically changed when discussing the ideas together.*/
+
 
 typedef struct __threadargs{
     pthread_mutex_t *mutex;
