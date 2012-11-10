@@ -1,0 +1,6 @@
+127.0.0.1 53300 Sat Nov 10 03:08:16 2012 "GET /testfiles/testme.html" 200 160
+127.0.0.1 53300 Sat Nov 10 03:08:17 2012 "GET /testfiles/testme.html" 200 160
+127.0.0.1 53300 Sat Nov 10 03:08:18 2012 "GET /testfiles/testme.html" 200 160
+127.0.0.1 53300 Sat Nov 10 03:08:18 2012 "GET /testfiles/1e5e7ca2.html" 200 1257
+127.0.0.1 53300 Sat Nov 10 03:08:19 2012 "GET /testfiles/testme.html" 200 160
+127.0.0.1 53307 Sat Nov 10 03:11:17 2012 "GET /testfiles/d3372875.html" 200 6661

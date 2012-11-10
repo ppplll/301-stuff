@@ -12,7 +12,7 @@
 
 #include "network.h"
 
-typedef struct threadargs{
+typedef struct __threadargs{
     pthread_mutex_t *mutex;
     pthread_cond_t *worker;   
     pthread_cond_t *producer;
@@ -20,8 +20,8 @@ typedef struct threadargs{
     int *nextout;
     int *requests;
     int numthreads;
-    int socketnumber;
-    struct sockaddr_in saddr;
+    int (**socketnumber);
+    struct sockaddr_in (**saddr);
 } threadargs;
 
 // global variable; can't be avoided because
@@ -57,28 +57,35 @@ int countlines(char * file, int len){
 
 void takeIn(char* tofile, FILE *fd){
     char buff[32000]; //excessive, but what if there are no newlines?
-    int charleft = 32000; //track unwritten file
+    int charleft = 31999; //track unwritten file
+    int len;
     tofile[0] = '\0';
-    while((charleft != 0) && (fgets(buff,charleft, fd))){
-        charleft -= strlen(buff);
+    while((fgets(buff,charleft, fd))){
+        len = strlen(buff);
+        charleft -= len;
+        if (charleft < len){
+            tofile[31999-charleft] = '\0';
+            break;
+        }
         strcat(tofile,buff);
     }
+    
     return;
 }
         
 
-void addRs(char *tofile, char *fromfile,int len, FILE * fd){
-    int i = 0;
-    int linelen = 0;
+void addRs(char *tofile, char *fromfile){
+    char *holder;
+    holder = strtok(fromfile,"\n");
     tofile[0] = '\0';
-    for(;i<len;i++){
-        linelen++;
-        if (fromfile[i] == '\n'){
-            strncat(tofile,fromfile,(linelen-1));
-            linelen = 0;
-            strcat(tofile,"\r\n");
-        }
+    strcat(tofile,holder);
+    strncat(tofile,"\r\n", 2);
+    while((holder = (strtok(NULL,"\n")))){
+        strcat(tofile,holder);
+        strncat(tofile,"\r\n", 2);
     }
+    strncat(tofile,"\r\n", 2);
+    return;
 }
 
 
@@ -97,9 +104,10 @@ char *twohundred(char *filename, struct stat statresult){
     takeIn(fileholder, fd);
     fclose(fd);
     char content[64000];
-    addRs(content,fileholder,strlen(fileholder), fd);
+    fprintf(stderr,"%s",fileholder);
+    addRs(content,fileholder);
     char line3[50];
-    sprintf(line3,l3temp,strlen(content));
+    sprintf(line3,l3temp,(strlen(content)));
     char *returnval;
     returnval = (char*) malloc(sizeof(char)*64250);
     strcpy(returnval,firstline);
@@ -147,19 +155,20 @@ void logit( struct sockaddr_in client_address, char * filename, char * responce,
     sprintf(temp1,buffer2,ntohs(client_address.sin_port));
     fputs(temp1,log);
 	fputs(" ",log);
-	fputs(ctime(&now),log);
+    char *temp3 = ctime(&now);
+    temp3[strlen(temp3)-1] = '\0';
+	fputs(temp3,log);
 	fputs(" \"GET ",log);
 	fputs(filename,log);
-	fputs(" ",log);	
+	fputs("\" ",log);	
 	if (error404)
 		fputs("404 ",log);
 	else
 		fputs("200 ",log);
 		
 	fputs(buffer,log);
+    fprintf(stderr,"abc: %s\n",responce);
 	fputs("\n",log);
-	
-	
 	fclose(log);
     return;	
 }
@@ -167,24 +176,24 @@ void logit( struct sockaddr_in client_address, char * filename, char * responce,
 
 void handlerequest(int socket, struct sockaddr_in saddr){
     char filename[1024];
-    //char dupe[1024];
     char *info;
     int error404 = 0;
     struct stat statresult;
-    int fofo = 0;
-    //int sum = socket*socket;
-    if (getrequest(socket, filename, 1024)){
+    if (getrequest(socket, filename, 1023)){
         printf("failure\n");
     }
     else {
-        fofo = stat(filename, &statresult);
-        //also stat filename w/o slash
-        if(!(fofo)){//if the file exists, start scripting
-            info = twohundred(filename, statresult);
+        if(filename[0]!='/'){//no slash
+            if(!(stat(filename, &statresult))){   
+                info = twohundred(filename, statresult);
+            }
+            else{
+                info = fourofour();
+                error404=1;
+            }
         }
         else{
-            fofo = stat(&(filename[1]), &statresult);
-            if(!(fofo)){//if the file exists, start scripting
+            if(!(stat(&(filename[1]), &statresult))){//if the file exist
                 info = twohundred(&(filename[1]), statresult);
             }
             else{
@@ -193,6 +202,7 @@ void handlerequest(int socket, struct sockaddr_in saddr){
             }
         }
         senddata(socket, info, strlen(info)+1);
+        //fprintf(stderr,"%d", strlen(info));
         logit( saddr, filename, info , error404);
         close(socket);
         free(info);
@@ -204,32 +214,30 @@ void handlerequest(int socket, struct sockaddr_in saddr){
 
 
 void *dowork(void *threadarg){    
-    threadargs **blah = (threadargs ** )(threadarg);
-    threadargs *sockets = *blah;
-    pthread_mutex_t mutex = *((sockets[0]).mutex);
+    threadargs *contain = (threadargs *) threadarg;
+    pthread_mutex_t *mutex = contain->mutex;
     while(1){
-        pthread_mutex_lock(&mutex);
-        int nextout = *(sockets[0].nextout);
-        int numthreads = (sockets[nextout].numthreads);
-        pthread_cond_t worker = *(sockets[nextout].worker);
-        int socket = sockets[nextout].socketnumber;
-        int requests = *(sockets[nextout].requests);
-        while (requests == 0){
-            pthread_cond_wait(&worker, &mutex); 
+        pthread_mutex_lock(mutex);
+        int numthreads = (contain->numthreads);
+        pthread_cond_t *worker = (contain->worker);
+        int *requests = (contain->requests);
+        while ((*requests) == 0){
+            pthread_cond_wait(worker, mutex); 
         }
+        int nextout = *(contain->nextout);
+        int socket = (*(contain->socketnumber))[nextout];
         fprintf(stderr,"Socket: %d\n", socket);
         if (socket == -9999){
-            pthread_mutex_unlock(&mutex); 
+            pthread_mutex_unlock(mutex); 
             return NULL;
         }
-        handlerequest(socket, sockets[nextout].saddr);
+        handlerequest(socket, (*(contain->saddr))[nextout]);
         nextout = ( nextout + 1 ) % numthreads; // find numthreads from arg that is passed
-        requests--;
-        *(sockets[0].nextout) = nextout;
-        *(sockets[0].requests) = requests;
-        pthread_cond_t producer = *(sockets[nextout].producer);
-        pthread_cond_signal(&producer);
-        pthread_mutex_unlock(&mutex);
+        (*(contain->socketnumber))[nextout] = nextout;
+        (*requests) = (*requests)-1;
+        pthread_cond_t *producer = (contain->producer);
+        pthread_cond_signal(producer);
+        pthread_mutex_unlock(mutex);
         }
     return NULL;
 }
@@ -237,33 +245,47 @@ void *dowork(void *threadarg){
 
 void runserver(int numthreads, unsigned short serverport) {
 
-    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t worker = PTHREAD_COND_INITIALIZER;
-    pthread_cond_t producer = PTHREAD_COND_INITIALIZER;
-    int nextin = 0;
-    int nextout = 0;
-    int requests = 0;
+    pthread_mutex_t *mutex = malloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init(mutex,NULL);//USYNC_THREAD
+    pthread_cond_t *worker = malloc(sizeof(pthread_cond_t));
+	pthread_cond_init(worker, NULL);
+    pthread_cond_t *producer = malloc(sizeof(pthread_cond_t));
+	pthread_cond_init(producer, NULL);
+    int *nextin = malloc(sizeof(int));
+	*nextin = 0;
+    int *nextout = malloc(sizeof(int));
+	*nextout = 0;
+    int *requests = malloc(sizeof(int));
+	*requests = 0;
     //////////////////////////////////////////////////
     pthread_t workers[numthreads];//pool of workers
-    threadargs targs[numthreads]; //pointer to ints, will use to pass socket numbers
+    int *sockets = malloc((sizeof(int))*numthreads);
+    struct sockaddr_in *addrs = malloc(sizeof(struct sockaddr_in)*numthreads); //pointer to ints, will use to pass socket numbers
     threadargs temparg;
-    temparg.mutex = &mutex;
-    temparg.worker = &worker;
-    temparg.producer = &producer;
-    temparg.nextin = &nextin;
-    temparg.nextout = &nextout;
-    temparg.requests = &requests;
+    temparg.mutex = mutex;
+    temparg.worker = worker;
+    temparg.producer = producer;
+    temparg.nextin = nextin;
+    temparg.nextout = nextout;
+    temparg.requests = requests;
     temparg.numthreads = numthreads;
-    temparg.socketnumber = 0;
     struct sockaddr_in holdaddr;
-    temparg.saddr = holdaddr;
     int i = 0;
     for(;i<numthreads;i++){
-        (targs[i]) = temparg;        
+        sockets[i] = 0;
+        addrs[i].sin_family = 0;
+		addrs[i].sin_port = 0;
+		addrs[i].sin_addr.s_addr = 0;
+		int j = 0;
+		for (;j<8;j++){
+			addrs[i].sin_zero[j]='\0';
+		}               
     }
+    temparg.socketnumber = &sockets;
+    temparg.saddr = &addrs;
     i = 0;
     for(; i<numthreads;i++){
-        pthread_create(&workers[i], NULL, dowork, &targs);
+        pthread_create(&workers[i], NULL, dowork, (void*)&temparg);
     }
     // create your pool of threads here
 
@@ -304,16 +326,16 @@ void runserver(int numthreads, unsigned short serverport) {
             
            
             ////////////////////////////////////////////////////////
-            pthread_mutex_lock(&mutex);            
-            while (requests == numthreads){
-                pthread_cond_wait(&producer, &mutex);
+            pthread_mutex_lock(mutex);            
+            while ((*requests) == numthreads){
+                pthread_cond_wait(producer, mutex);
             }
-            (targs[nextin]).socketnumber = new_sock;
-            (targs[nextin]).saddr = client_address;
-            nextin = (nextin +1) % numthreads;
-            requests++;
-            pthread_cond_signal(&worker);
-            pthread_mutex_unlock(&mutex);
+            sockets[(*nextin)] = new_sock;
+            addrs[(*nextin)] = client_address;
+            *nextin = ((*nextin) +1) % numthreads;
+            *requests = (*requests) +1;
+            pthread_cond_signal(worker);
+            pthread_mutex_unlock(mutex);
            /* You got a new connection.  Hand the connection off
             * to one of the threads in the pool to process the
             * request.
@@ -327,14 +349,14 @@ void runserver(int numthreads, unsigned short serverport) {
         }
     }
     //closeing threads -- eventually will be refactored into a function
-    for(;i<requests;i++){
-        pthread_cond_signal(&worker);//clear out the rest of the requests
+    for(;i<(*requests);i++){
+        pthread_cond_signal(worker);//clear out the rest of the requests
     } 
-    (targs[nextout]).socketnumber = -9999;//alert threads that we're closing
+    sockets[(*nextout)] = -9999;//alert threads that we're closing
     i = 0;
-    requests = numthreads+1;
+    (*requests) = numthreads+1;
     for(; i <numthreads;i++){//all threads should have exited
-        pthread_cond_signal(&worker);
+        pthread_cond_signal(worker);
     }
     i = 0;
     for(; i <numthreads;i++){//pick up the scraps
@@ -345,6 +367,9 @@ void runserver(int numthreads, unsigned short serverport) {
     
     
     fprintf(stderr, "Server shutting down.\n");
+	pthread_mutex_destroy(mutex);
+	pthread_cond_destroy(worker);
+	pthread_cond_destroy(producer);
     close(main_socket);
 }
 
