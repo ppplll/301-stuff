@@ -20,8 +20,8 @@ typedef struct __threadargs{
     int *nextout;
     int *requests;
     int numthreads;
-    int (**socketnumber);
-    struct sockaddr_in (**saddr);
+    int (*socketnumber)[];
+    struct sockaddr_in (*saddr)[];
 } threadargs;
 
 // global variable; can't be avoided because
@@ -244,47 +244,37 @@ void *dowork(void *threadarg){
 
 
 void runserver(int numthreads, unsigned short serverport) {
-
-    pthread_mutex_t *mutex = malloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init(mutex,NULL);//USYNC_THREAD
-    pthread_cond_t *worker = malloc(sizeof(pthread_cond_t));
-	pthread_cond_init(worker, NULL);
-    pthread_cond_t *producer = malloc(sizeof(pthread_cond_t));
-	pthread_cond_init(producer, NULL);
-    int *nextin = malloc(sizeof(int));
-	*nextin = 0;
-    int *nextout = malloc(sizeof(int));
-	*nextout = 0;
-    int *requests = malloc(sizeof(int));
-	*requests = 0;
-    //////////////////////////////////////////////////
-    pthread_t workers[numthreads];//pool of workers
-    int *sockets = malloc((sizeof(int))*numthreads);
-    struct sockaddr_in *addrs = malloc(sizeof(struct sockaddr_in)*numthreads); //pointer to ints, will use to pass socket numbers
-    threadargs temparg;
-    temparg.mutex = mutex;
-    temparg.worker = worker;
-    temparg.producer = producer;
-    temparg.nextin = nextin;
-    temparg.nextout = nextout;
-    temparg.requests = requests;
+	//setting up args//
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t worker = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t producer = PTHREAD_COND_INITIALIZER;
+    int nextin = 0;
+    int nextout = 0;
+    int requests = 0;
+    int sockets[numthreads];//stores the socket numbers, how the threads will know what socket to send a file to
+    struct sockaddr_in addrs[numthreads]; //socket addresses, this with the sockets array will tell the workers where to send info
+    threadargs temparg;//dummy arg
+    temparg.mutex = &mutex;
+    temparg.worker = &worker;
+    temparg.producer = &producer;
+	//nextin, nextout, and requests will all be pointers to an in b/c they will be shared amongst all threads to help w/ concurrency
+    temparg.nextin = &nextin;
+    temparg.nextout = &nextout;
+    temparg.requests = &requests;
     temparg.numthreads = numthreads;
     struct sockaddr_in holdaddr;
     int i = 0;
-    for(;i<numthreads;i++){
+    for(;i<numthreads;i++){//initialze lists
         sockets[i] = 0;
-        addrs[i].sin_family = 0;
-		addrs[i].sin_port = 0;
-		addrs[i].sin_addr.s_addr = 0;
-		int j = 0;
-		for (;j<8;j++){
-			addrs[i].sin_zero[j]='\0'               
+        addrs[i] = holdaddr;               
     }
-    temparg.socketnumber = &sockets;
+    temparg.socketnumber = &sockets;//use a pointer to these lists to enable sharing
     temparg.saddr = &addrs;
+	//whew.. all done w/ that, now lets make some threads
+	pthread_t workers[numthreads];
     i = 0;
     for(; i<numthreads;i++){
-        pthread_create(&workers[i], NULL, dowork, (void*)&temparg);
+        pthread_create(&workers[i], NULL, dowork, (void*)&temparg);//make the lists
     }
     // create your pool of threads here
 
@@ -325,37 +315,30 @@ void runserver(int numthreads, unsigned short serverport) {
             
            
             ////////////////////////////////////////////////////////
-            pthread_mutex_lock(mutex);            
-            while ((*requests) == numthreads){
-                pthread_cond_wait(producer, mutex);
+            pthread_mutex_lock(&mutex);            
+            while (requests == numthreads){//dont give us too much work
+                pthread_cond_wait(&producer, &mutex);
             }
-            sockets[(*nextin)] = new_sock;
-            addrs[(*nextin)] = client_address;
-            *nextin = ((*nextin) +1) % numthreads;
-            *requests = (*requests) +1;
-            pthread_cond_signal(worker);
-            pthread_mutex_unlock(mutex);
-           /* You got a new connection.  Hand the connection off
-            * to one of the threads in the pool to process the
-            * request.
-            *
-            * Don't forget to close the socket (in the worker thread)
-            * when you're done.
-            */
+            sockets[nextin] = new_sock;//update the socket info
+            addrs[nextin] = client_address;//and the address
+            nextin = (nextin +1) % numthreads;//overwrite last used bin
+            requests++;//one more task
+            pthread_cond_signal(&worker);
+            pthread_mutex_unlock(&mutex);
            ////////////////////////////////////////////////////////
 
 
         }
     }
     //closeing threads -- eventually will be refactored into a function
-    for(;i<(*requests);i++){
-        pthread_cond_signal(worker);//clear out the rest of the requests
+    for(;i<requests;i++){
+        pthread_cond_signal(&worker);//clear out the rest of the requests
     } 
-    sockets[(*nextout)] = -9999;//alert threads that we're closing
+    sockets[nextout] = -9999;//alert threads that we're closing
     i = 0;
-    (*requests) = numthreads+1;
+    requests = numthreads+1;
     for(; i <numthreads;i++){//all threads should have exited
-        pthread_cond_signal(worker);
+        pthread_cond_signal(&worker);
     }
     i = 0;
     for(; i <numthreads;i++){//pick up the scraps
@@ -366,12 +349,28 @@ void runserver(int numthreads, unsigned short serverport) {
     
     
     fprintf(stderr, "Server shutting down.\n");
-	pthread_mutex_destroy(mutex);
-	pthread_cond_destroy(worker);
-	pthread_cond_destroy(producer);
+	pthread_mutex_destroy(&mutex);
+	pthread_cond_destroy(&worker);
+	pthread_cond_destroy(&producer);
     close(main_socket);
 }
 
+void closeworkers(int requests, int nextout, pthread_cond_t worker,pthread_t *workers, int sockets[], int numthreads){//took out of run server for better readability
+	int i = 0;
+	for(;i<requests;i++){
+        pthread_cond_signal(&worker);//clear out the rest of the requests
+    } 
+    sockets[nextout] = -9999;//alert threads that we're closing
+    i = 0;
+    requests = numthreads+1;
+    for(; i <numthreads;i++){//all threads should have exited
+        pthread_cond_signal(&worker);
+    }
+    i = 0;
+    for(; i <numthreads;i++){//pick up the scraps
+        pthread_join(workers[i], NULL);
+    }
+}
 
 int main(int argc, char **argv) {
     unsigned short port = 3000;
