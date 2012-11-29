@@ -131,12 +131,12 @@ int fs_rmdir(const char *path) {
     }
     //remove the dir
     s3dirent_t *dir;
-    s3fs_get_object(S3BUCKET,path, (uint8_t **) &dir, 0, 0);
+    s3fs_get_object(S3BUCKET,key, (uint8_t **) &dir, 0, 0);
     int dsize = (dir[0].size)/(sizeof(s3dirent_t));
     if (dsize!=1){//make sure the dir is of size one
         return 0;
     }
-    s3fs_remove_object(S3BUCKET,path);//remove this object from the cloud
+    s3fs_remove_object(S3BUCKET,key);//remove this object from the cloud
     //update parent dir
     s3dirent_t *pdir;
     s3fs_get_object(S3BUCKET,parent, (uint8_t **) &pdir, 0, 0);

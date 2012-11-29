@@ -20,7 +20,7 @@
 // store filesystem state information in this struct
 
 typedef struct {
-    char name[1024];
+    char * name[1024];
     char type;
     int size;
     } s3dirent_t;
