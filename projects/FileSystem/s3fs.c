@@ -46,11 +46,12 @@
     
 
 int fs_findtype( char *path){
-    //int ftype = 0;
     char parent[1024];
     char file[1024];
-    strcpy(parent,dirname(path));
-    strcpy(file, basename(path));
+    char cpy[1024];
+    strcpy(cpy,path);
+    strcpy(parent,dirname(cpy));
+    strcpy(file, basename(cpy));
     s3dirent_t * parentdir; 
     s3fs_get_object(S3BUCKET, parent, (uint8_t **) &parentdir, 0, 0);
     int dirsize = (parentdir[0].size)/(sizeof(s3dirent_t));
@@ -102,8 +103,66 @@ int fs_mkdir(const char *path, mode_t mode) {
     fprintf(stderr, "fs_mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
     s3context_t *ctx = GET_PRIVATE_DATA;
     mode |= S_IFDIR;
+	
+	char key[1024];
+    char parent[1024];
+    char cpy[1024];
+    strcpy(cpy,path);
+    strcpy(parent,dirname(cpy));
+    strcpy(key, basename(cpy));
+	
+	
+	//No parent directory
+	if(fs_findtype(parent) !=1){
+    	return -EIO;
+    }
+	
+	//The directory you want to make already exits
+	if(fs_findtype(path) ==1 ){
+        return -EEXIST;
+    }
+    
+    
+    
+    //create and upload the new directroy
+    s3dirent_t newdir[1];
+    strcpy(newdir[0].name,".");
+    newdir[0].type = 'd';
+    newdir[0].size = sizeof(newdir);
+    newdir[0].st_mode = (S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR);
+    s3fs_put_object(S3BUCKET,path, (uint8_t*) newdir, newdir[0].size); 
+    
+    
+    
+    
+    //create new updated parent directory to replace the old outdated one 
+    s3dirent_t *parentdir;
+    s3fs_get_object(S3BUCKET,parent, (uint8_t **) &parentdir, 0, 0);
+    
+    int plength=(parentdir[0].size)/sizeof(s3dirent_t);
+    s3dirent_t newparent[plength+1];
+    
+    int item =0;
+    for(;item<plength;item++)
+    {
+    	newparent[item]=parentdir[item];
+    }
+    
+    strcpy(newparent[plength].name,key);
+    newparent[plength].type='d';
+    newparent[plength].size=sizeof(newdir);
+    
+    newparent[0].size=sizeof(newparent);
+    
+    s3fs_remove_object(S3BUCKET,parent);//ineffecient :)
+    s3fs_put_object(S3BUCKET,parent, (uint8_t*) newparent, newparent[0].size); 
 
-    return -EIO;
+    
+    return ctx;
+
+	
+	
+    
 }
 
 /*
@@ -121,8 +180,10 @@ int fs_unlink(const char *path) {
 int fs_rmdir(const char *path) {
     char key[1024];
     char parent[1024];
-    strcpy(key, basename(path));
-    strcpy(parent, dirname(path));
+    char cpy[1024];
+    strcpy(cpy,path);
+    strcpy(parent,dirname(cpy));
+    strcpy(key, basename(cpy));
     fprintf(stderr, "fs_rmdir(path=\"%s\")\n", path);
     s3context_t *ctx = GET_PRIVATE_DATA;
     //check that we are infact removing a dir
@@ -308,7 +369,12 @@ int fs_fsync(const char *path, int datasync, struct fuse_file_info *fi) {
 int fs_opendir(const char *path, struct fuse_file_info *fi) {
     fprintf(stderr, "fs_opendir(path=\"%s\")\n", path);
     s3context_t *ctx = GET_PRIVATE_DATA;
-    return -EIO;
+    
+	if( fs_findtype(path) !=1 ){
+        return -EIO;
+    }
+     return 0;
+    
 }
 
 /*
@@ -372,6 +438,7 @@ void *fs_init(struct fuse_conn_info *conn)
     strcpy(root[0].name,".");
     root[0].type = 'd';
     root[0].size = sizeof(root);
+    root[0].st_mode = (S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR);
     //to the cloud! 
     s3fs_put_object(S3BUCKET,"/", (uint8_t*) root, root[0].size); 
     return ctx;
@@ -385,6 +452,9 @@ void *fs_init(struct fuse_conn_info *conn)
 void fs_destroy(void *userdata) {
     fprintf(stderr, "fs_destroy --- shutting down file system.\n");
     free(userdata);
+    int val = s3fs_clear_bucket(S3BUCKET);
+    
+    
 }
 
 /*
@@ -494,3 +564,4 @@ int main(int argc, char *argv[]) {
     
     return fuse_stat;
 }
+
