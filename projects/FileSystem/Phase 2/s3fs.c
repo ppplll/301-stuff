@@ -282,8 +282,8 @@ int fs_rmdir(const char *path) {
     char parent[1024];
     char cpy[1024];
     strcpy(cpy,path);
-    strcpy(parent,dirname(cpy));
     strcpy(key, basename(cpy));
+    strcpy(parent,dirname(cpy));
     fprintf(stderr, "fs_rmdir(path=\"%s\")\n", path);
     s3context_t *ctx = GET_PRIVATE_DATA;
     //check that we are infact removing a dir
