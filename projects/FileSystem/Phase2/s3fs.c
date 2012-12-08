@@ -404,6 +404,36 @@ int fs_rmdir(const char *path) {
     return 0;
 }   
     
+int fs_filemover(const char *path, const char *newpath){//
+//essentailly the same as rename except w/ no metadat transfers b/c
+//files heirarchy should tansfer too.
+    int type = fs_findtype(path);
+    if (type == 0 ){
+        return -1;
+    }
+    uint8_t * file;//get directory
+    int prv = s3fs_get_object(getenv(S3BUCKET), path, &file, 0, 0);
+    s3fs_put_object(getenv(S3BUCKET), newpath,(uint8_t*) file, prv);
+    s3fs_remove_object(getenv(S3BUCKET),path);
+    if (type == 1){
+        int dirsize = prv/(sizeof(s3dirent_t));
+        s3dirent_t *dir = (s3dirent_t *)file; 
+        int i = 1;
+        for (;i<dirsize;i++){
+            char temp[1024];
+            char temp2[1024];
+            strcpy(temp,path);
+            strcat(temp,dir[i].name);
+            strcpy(temp2,newpath);
+            strcat(temp2,dir[i].name);
+            fs_filemover(temp,temp2);
+        }
+    }
+    free(file);
+    return 1;
+}
+         
+
 
 /*
  * Rename a file.
@@ -416,9 +446,11 @@ int fs_rename(const char *path, const char *newpath) {
     strcpy(cpy,path);
     strcpy(file, basename(cpy));
     strcpy(parent,dirname(cpy));
-    if (fs_findtype(path) != 2){//if not a file, return -1
+    int ftype = fs_findtype(path);
+    if (ftype == 0){//if not a file or dir, return -1
         return -1;
     }
+                
     uint8_t * thefile;
     int fsize = s3fs_get_object(getenv(S3BUCKET), path, &thefile, 0, 0);
     uint8_t * pbuff;//get directory
@@ -428,15 +460,33 @@ int fs_rename(const char *path, const char *newpath) {
     //find file for later to update metadata if needed
     int j = 0;
     int fildex;
+    fprintf(stderr,"\nbefore loop\n");
     for(;j<psize;j++){
+        if ((ftype == 1) && (j!=0)){//recursively change dirs files
+            char temp[1024];
+            char temp2[1024];
+            strcpy(temp,path);
+            strcat(temp,pdir[j].name);
+            strcpy(temp2,newpath);
+            strcat(temp2,pdir[j].name);
+            fs_filemover(temp,temp2);
+        }
         if (!strcmp(pdir[j].name,file)){
             fildex = j;
         }
+            
     }
+    fprintf(stderr,"\nafter\n");
     s3dirent_t mover = pdir[fildex];
-    unlink(path);
+    unlink(path);//takes care of my old destination
+    char destparent[1024];
+    char destcpy[1024];
+    char destfile[1024];
+    strcpy(destcpy,newpath);
+    strcpy(destfile,basename(destcpy));
+    strcpy(destparent,dirname(destcpy));
     uint8_t * destbuff;//get directory
-    int drv = s3fs_get_object(getenv(S3BUCKET), parent, &pbuff, 0, 0);
+    int drv = s3fs_get_object(getenv(S3BUCKET), destparent,&destbuff, 0, 0);
     int dsize = (drv)/(sizeof(s3dirent_t));
     s3dirent_t * ppdir = (s3dirent_t*)destbuff;
     s3dirent_t newdest[dsize+1];
@@ -447,7 +497,7 @@ int fs_rename(const char *path, const char *newpath) {
     newdest[i] = mover;
     newdest[0].st_size = sizeof(newdest);
     s3fs_put_object(getenv(S3BUCKET), newpath,thefile,fsize);
-    s3fs_put_object(getenv(S3BUCKET), dirname(newpath),(uint8_t *)newdest ,newdest[0].st_size);
+    s3fs_put_object(getenv(S3BUCKET), destparent,(uint8_t *)newdest ,newdest[0].st_size);
     free(thefile); 
     free(destbuff);
     free(pbuff);
