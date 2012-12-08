@@ -413,7 +413,7 @@ int fs_rename(const char *path, const char *newpath) {
     char parent[1024];
     char cpy[1024];
     strcpy(cpy,path);
-    strcpy(key, basename(cpy));
+    strcpy(file, basename(cpy));
     strcpy(parent,dirname(cpy));
     if (fs_findtype(path) != 2){//if not a file, return -1
         return -1;
@@ -593,20 +593,24 @@ int fs_write(const char *path, const char *buf, size_t size, off_t offset, struc
     int i = 0;
     int bytes = 0;
     if ((size+offset)>rv){
+        fprintf(stderr,"\ningrower\n");
         uint8_t * newbuff = malloc( sizeof(uint8_t)*(size+offset));
+        fprintf(stderr,"\nmalloced\n");
         for (;i<size+offset;i++){
             if (i<offset){
                 newbuff[i] = buff[i];
             } else{
-                buff[i] = buf[i]; 
+                newbuff[i] = buf[i]; 
             }bytes++;
         }
-        pdir[fildex].st_size = sizeof(sizeof(uint8_t)*(size+offset));
+        fprintf(stderr,"\nloop done\n");
+        pdir[fildex].st_size = sizeof((size+offset));
         s3fs_put_object(getenv(S3BUCKET),path,(uint8_t*) newbuff, pdir[fildex].st_size);
         s3fs_put_object(getenv(S3BUCKET),parent,(uint8_t*) pdir, pdir[0].st_size);
         free(buff);
         free(pbuff);
         free(newbuff);
+        fprintf(stderr,"\nall done\n");
         return bytes;
             
     }else{
