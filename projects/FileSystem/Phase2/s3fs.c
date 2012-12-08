@@ -330,9 +330,10 @@ int fs_unlink(const char *path) {
     }
     s3fs_remove_object(getenv(S3BUCKET),path);//gone!
     //now update meta data!
-     s3dirent_t *pdir;
-     s3fs_get_object(getenv(S3BUCKET),parent, (uint8_t **) &pdir, 0, 0);
-    int psize = (pdir[0].st_size)/(sizeof(s3dirent_t));
+    uint8_t * pbuff;//get directory
+    int prv = s3fs_get_object(getenv(S3BUCKET), parent, &pbuff, 0, 0);
+    int psize = (prv)/(sizeof(s3dirent_t));
+    s3dirent_t * pdir = (s3dirent_t*)pbuff;
     s3dirent_t newparent[(psize-1)];
     int i =0;
     int j = 0;
@@ -418,6 +419,8 @@ int fs_rename(const char *path, const char *newpath) {
     if (fs_findtype(path) != 2){//if not a file, return -1
         return -1;
     }
+    uint8_t * thefile;
+    int fsize = s3fs_get_object(getenv(S3BUCKET), path, &thefile, 0, 0);
     uint8_t * pbuff;//get directory
     int prv = s3fs_get_object(getenv(S3BUCKET), parent, &pbuff, 0, 0);
     int psize = (prv)/(sizeof(s3dirent_t));
@@ -430,10 +433,24 @@ int fs_rename(const char *path, const char *newpath) {
             fildex = j;
         }
     }
-    fs_mknod(newpath, pdir[fildex].st_mode, 0);
-    fs_unlink(path);
-    s3context_t *ctx = GET_PRIVATE_DATA;
-    free(pdir);
+    s3dirent_t mover = pdir[fildex];
+    unlink(path);
+    uint8_t * destbuff;//get directory
+    int drv = s3fs_get_object(getenv(S3BUCKET), parent, &pbuff, 0, 0);
+    int dsize = (drv)/(sizeof(s3dirent_t));
+    s3dirent_t * ppdir = (s3dirent_t*)destbuff;
+    s3dirent_t newdest[dsize+1];
+    int i = 0;
+    for(; i<dsize;i++){
+        newdest[i] = ppdir[i];
+    }
+    newdest[i] = mover;
+    newdest[0].st_size = sizeof(newdest);
+    s3fs_put_object(getenv(S3BUCKET), newpath,thefile,fsize);
+    s3fs_put_object(getenv(S3BUCKET), dirname(newpath),(uint8_t *)newdest ,newdest[0].st_size);
+    free(thefile); 
+    free(destbuff);
+    free(pbuff);
     return 0;
 }
 
@@ -482,9 +499,12 @@ int fs_truncate(const char *path, off_t newsize) {
             fildex = j;
         }
     }
-    mode_t mode = pdir[fildex].st_mode = mode;//get necessary metadata
-    unlink(path);//remove
-    mknod(path, mode, 0);//and put back
+    pdir[fildex].st_size = 0;//change necessary metadata
+    s3fs_put_object(getenv(S3BUCKET),parent,(uint8_t*) pdir, pdir[0].st_size);
+    free(pbuff);
+    s3fs_remove_object(getenv(S3BUCKET),path);
+    s3fs_put_object(getenv(S3BUCKET),path,0 , 0);
+    
     return 0;
 }
 
