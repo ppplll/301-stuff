@@ -348,8 +348,7 @@ int fs_unlink(const char *path) {
     }
     newparent[0].st_size = sizeof(newparent);//update the size
     s3fs_put_object(getenv(S3BUCKET), parent,(uint8_t*) newparent, newparent[0].st_size);
-    free(pdir);
-    free(dir); 
+    free(pdir); 
     return 0;
     
     
@@ -410,19 +409,19 @@ int fs_rmdir(const char *path) {
  */
 int fs_rename(const char *path, const char *newpath) {
     fprintf(stderr, "fs_rename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
-    char key[1024];
+    char file[1024];
     char parent[1024];
     char cpy[1024];
     strcpy(cpy,path);
-    strcpy(key, basename(cpy));
+    strcpy(file, basename(cpy));
     strcpy(parent,dirname(cpy));
     if (fs_findtype(path) != 2){//if not a file, return -1
         return -1;
     }
     uint8_t * pbuff;//get directory
-    int prv = s3fs_get_object(getenv(S3BUCKET), parent, &buff, 0, 0);
+    int prv = s3fs_get_object(getenv(S3BUCKET), parent, &pbuff, 0, 0);
     int psize = (prv)/(sizeof(s3dirent_t));
-    s3dirent_t * pdir = (s3dirent_t*)buff;
+    s3dirent_t * pdir = (s3dirent_t*)pbuff;
     //find file for later to update metadata if needed
     int j = 0;
     int fildex;
@@ -431,7 +430,7 @@ int fs_rename(const char *path, const char *newpath) {
             fildex = j;
         }
     }
-    int fs_mknod(newpath, pdir[fildex].st_mode, dev_t dev);
+    fs_mknod(newpath, pdir[fildex].st_mode, 0);
     fs_unlink(path);
     s3context_t *ctx = GET_PRIVATE_DATA;
     free(pdir);
@@ -462,8 +461,31 @@ int fs_chown(const char *path, uid_t uid, gid_t gid) {
  */
 int fs_truncate(const char *path, off_t newsize) {
     fprintf(stderr, "fs_truncate(path=\"%s\", newsize=%d)\n", path, (int)newsize);
-    s3context_t *ctx = GET_PRIVATE_DATA;
-    return -EIO;
+    char file[1024];
+    char parent[1024];
+    char cpy[1024];
+    strcpy(cpy,path);
+    strcpy(file, basename(cpy));
+    strcpy(parent,dirname(cpy));
+    if (fs_findtype(path) != 2){//if not a file, return -1
+        return -1;
+    }
+    uint8_t * pbuff;//get directory
+    int prv = s3fs_get_object(getenv(S3BUCKET), parent, &pbuff, 0, 0);
+    int psize = (prv)/(sizeof(s3dirent_t));
+    s3dirent_t * pdir = (s3dirent_t*)pbuff;
+    //find file for later to update metadata if needed
+    int j = 0;
+    int fildex;
+    for(;j<psize;j++){
+        if (!strcmp(pdir[j].name,file)){
+            fildex = j;
+        }
+    }
+    mode_t mode = pdir[fildex].st_mode = mode;//get necessary metadata
+    unlink(path);//remove
+    mknod(path, mode, 0);//and put back
+    return 0;
 }
 
 /*
@@ -556,9 +578,9 @@ int fs_write(const char *path, const char *buf, size_t size, off_t offset, struc
     uint8_t * buff;
     int rv = s3fs_get_object(getenv(S3BUCKET), path, &buff, 0, 0);
     uint8_t * pbuff;//get directory
-    int prv = s3fs_get_object(getenv(S3BUCKET), parent, &buff, 0, 0);
+    int prv = s3fs_get_object(getenv(S3BUCKET), parent, &pbuff, 0, 0);
     int psize = (prv)/(sizeof(s3dirent_t));
-    s3dirent_t * pdir = (s3dirent_t*)buff;
+    s3dirent_t * pdir = (s3dirent_t*)pbuff;
     //find file for later to update metadata if needed
     int j = 0;
     int fildex;
@@ -774,8 +796,7 @@ int fs_access(const char *path, int mask) {
  */
 int fs_ftruncate(const char *path, off_t offset, struct fuse_file_info *fi) {
     fprintf(stderr, "fs_ftruncate(path=\"%s\", offset=%d)\n", path, (int)offset);
-    s3context_t *ctx = GET_PRIVATE_DATA;
-    return -EIO;
+    return truncate(path, offset);
 }
 
 /*
